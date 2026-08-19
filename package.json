@@ -1,0 +1,26 @@
+{
+  "name": "drop-em-server",
+  "version": "1.0.0",
+  "description": "WSS Server for Drop Em",
+  "keywords": [
+    "wss",
+    "drop-em",
+    "server"
+  ],
+  "homepage": "https://github.com/Kbushra/Drop-Em-Server#readme",
+  "bugs": {
+    "url": "https://github.com/Kbushra/Drop-Em-Server/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kbushra/Drop-Em-Server.git"
+  },
+  "license": "ISC",
+  "author": "Quib Inc.",
+  "type": "module",
+  "main": "server.ts",
+  "scripts": {},
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}
