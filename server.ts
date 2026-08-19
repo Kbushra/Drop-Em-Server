@@ -41,7 +41,7 @@ app.get("/", (req: express.Request, res: express.Response) => { res.send("You're
 
 const server = createServer();
 const port: number = process.env.PORT as any as number || 6520;
-const wss: WebSocketServer = new WebSocketServer({ server, port });
+const wss: WebSocketServer = new WebSocketServer({ server });
 
 wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
 {
