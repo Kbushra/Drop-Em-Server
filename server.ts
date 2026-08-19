@@ -33,7 +33,7 @@ interface ClientInfo
 }
 
 const wss: WebSocketServer = new WebSocketServer({ port: 6520 });
-console.log(`WSS hosting info: ${wss.address()}`);
+console.log(`WSS hosting info: ${JSON.stringify(wss.address())}`);
 
 wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
 {
