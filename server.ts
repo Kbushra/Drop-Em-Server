@@ -39,7 +39,7 @@ interface ClientInfo
 const app = express();
 app.get("/", (req: express.Request, res: express.Response) => { res.send("You're supposed to access via WSS btw."); })
 
-const server = createServer();
+const server = createServer(app);
 const port: number = process.env.PORT as any as number || 6520;
 const wss: WebSocketServer = new WebSocketServer({ server });
 
