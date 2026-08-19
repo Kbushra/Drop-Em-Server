@@ -1,15 +1,17 @@
 import { IncomingMessage } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 
-enum NETWORK_TYPES
+const NETWORK_TYPES =
 {
-	ADD_SERVER,
-	GET_SERVERS,
-	CONNECT,
-	INPUTS,
-	CLIENT_DATA,
-	HOST_DATA
-}
+	ADD_SERVER: 0,
+	GET_SERVERS: 1,
+	CONNECT: 2,
+	INPUTS: 3,
+	CLIENT_DATA: 4,
+	HOST_DATA: 5
+} as const;
+
+type NETWORK_TYPES = (typeof NETWORK_TYPES)[keyof typeof NETWORK_TYPES];
 
 interface WebSocketR extends WebSocket
 {
@@ -40,7 +42,7 @@ wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
         const json: Object = JSON.parse(data);
         if (!("type" in json)) { return; }
 
-        switch (json.type)
+        switch (json.type as NETWORK_TYPES)
         {
             case NETWORK_TYPES.ADD_SERVER: response_add_server(json, ws); break;
             case NETWORK_TYPES.GET_SERVERS: response_get_servers(json, ws); break;
