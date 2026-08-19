@@ -1,4 +1,4 @@
-import { IncomingMessage, createServer } from "http";
+import { IncomingMessage, Server, createServer } from "http";
 import { WebSocket, WebSocketServer } from "ws";
 import express from "express";
 
@@ -39,12 +39,13 @@ interface ClientInfo
 const app = express();
 app.get("/", (req: express.Request, res: express.Response) => { res.send("You're supposed to access via WSS btw."); })
 
-const server = createServer(app);
-const port: number = process.env.PORT as any as number || 6520;
+const server: Server = createServer(app);
+const port: number = Number(process.env.PORT || 6520);
 const wss: WebSocketServer = new WebSocketServer({ server });
 
 wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
 {
+    console.log(`Connection established at ${req.socket.remoteAddress}:${req.socket.remotePort}`);
     ws.req = req;
 
     ws.on("message", (data: string) =>
@@ -64,7 +65,7 @@ wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
     });
 });
 
-server.listen(port, () => { console.log(`Listening on port ${port}.`) })
+server.listen(port, "0.0.0.0", () => { console.log(`Listening on port ${port}.`) });
 
 function response_add_server(data: Object, ws: WebSocketR)
 {
