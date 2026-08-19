@@ -1,5 +1,9 @@
-import { IncomingMessage } from "http";
+import { IncomingMessage, createServer } from "http";
 import { WebSocket, WebSocketServer } from "ws";
+import express from "express";
+
+import dotenv from "dotenv";
+dotenv.config();
 
 const NETWORK_TYPES =
 {
@@ -32,8 +36,12 @@ interface ClientInfo
     id: number
 }
 
-const wss: WebSocketServer = new WebSocketServer({ port: 6520 });
-console.log(`WSS hosting info: ${JSON.stringify(wss.address())}`);
+const app = express();
+app.get("/", (req: express.Request, res: express.Response) => { res.send("You're supposed to access via WSS btw."); })
+
+const server = createServer();
+const port: number = process.env.PORT as any as number || 6520;
+const wss: WebSocketServer = new WebSocketServer({ server, port });
 
 wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
 {
@@ -55,6 +63,8 @@ wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
         }
     });
 });
+
+server.listen(port, () => { console.log(`Listening on port ${port}.`) })
 
 function response_add_server(data: Object, ws: WebSocketR)
 {
