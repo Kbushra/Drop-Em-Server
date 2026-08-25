@@ -7,12 +7,11 @@ dotenv.config();
 
 const NETWORK_TYPES =
 {
-	ADD_SERVER: 0,
-	GET_SERVERS: 1,
+	ADD_HOST: 0,
+	GET_HOSTS: 1,
 	CONNECT: 2,
-	INPUTS: 3,
-	CLIENT_DATA: 4,
-	HOST_DATA: 5
+	SET_INPUTS_GET_FRAME: 3,
+    SET_FRAME_GET_INPUTS: 4
 } as const;
 
 type NETWORK_TYPES = (typeof NETWORK_TYPES)[keyof typeof NETWORK_TYPES];
@@ -22,24 +21,38 @@ interface WebSocketR extends WebSocket
     req?: IncomingMessage;
 }
 
+interface InputInfo
+{
+    input_pressed: boolean[],
+    input_held: boolean[],
+    input_released: boolean[],
+    delta: number
+}
+
 interface HostInfo
 {
     ip: string,
     port: number,
+
     name: string,
     creation_time: number,
-    join_code_index: number
+    join_code_index: number,
+
+    client_indices: number[],
+    frame_data: Record<string, any>
 }
 
 interface ClientInfo
 {
     ip: string,
     port: number,
-    id: number
+
+    host_index: number,
+    input_data: InputInfo
 }
 
 const join_codes: string[] = [];
-const servers: HostInfo[] = [];
+const hosts: HostInfo[] = [];
 const clients: ClientInfo[] = [];
 
 const app = express();
@@ -51,32 +64,39 @@ const wss: WebSocketServer = new WebSocketServer({ server });
 
 wss.on("connection", (ws: WebSocketR, req: IncomingMessage) =>
 {
-    console.log(`Connection established at ${req.socket.remoteAddress}:${req.socket.remotePort}`);
+    console.log(`Connection established at ${remote_id(req)}`);
     ws.req = req;
 
     ws.on("message", (data: string) =>
     {
-        const json: Object | null = safe_parse(data);
+        const json: Record<string, any> | null = safe_parse(data);
         if (json === null || !("type" in json)) { return; }
 
         switch (json.type as NETWORK_TYPES)
         {
-            case NETWORK_TYPES.ADD_SERVER: response_add_server(json, ws); break;
-            case NETWORK_TYPES.GET_SERVERS: response_get_servers(json, ws); break;
+            case NETWORK_TYPES.ADD_HOST: response_add_host(json, ws); break;
+            case NETWORK_TYPES.GET_HOSTS: response_get_hosts(json, ws); break;
             case NETWORK_TYPES.CONNECT: response_connect(json, ws); break;
-            case NETWORK_TYPES.INPUTS: response_inputs(json, ws); break;
-            case NETWORK_TYPES.CLIENT_DATA: response_client_data(json, ws); break;
-            case NETWORK_TYPES.HOST_DATA: response_host_data(json, ws); break;
+            case NETWORK_TYPES.SET_INPUTS_GET_FRAME: response_set_inputs_get_frame(json, ws); break;
+            case NETWORK_TYPES.SET_FRAME_GET_INPUTS: response_set_frame_get_inputs(json, ws); break;
         }
     });
 });
 
 server.listen(port, "0.0.0.0", () => { console.log(`Listening on port ${port}.`) });
 
-function safe_parse(data: string): Object | null
+function remote_id(req: IncomingMessage) { return `${req.socket.remoteAddress}:${req.socket.remotePort}`; }
+
+function safe_parse(data: string): Record<string, any> | null
 {
-    try { return JSON.parse(data); }
-    catch (e) { return null; }
+    try
+    {
+        const res: object = JSON.parse(data);
+        if (!Array.isArray(res)) { return res; }
+    }
+    catch (e) {}
+
+    return null;
 }
 
 function verify(data: Record<string, any>, prop_names: string[], prop_types: string[])
@@ -143,49 +163,121 @@ function generate_join_code(blacklist: string[]): string
     return "";
 }
 
-function response_add_server(data: any, ws: WebSocketR)
+function response_add_host(data: Record<string, any>, ws: WebSocketR)
 {
     const code: string = generate_join_code(join_codes);
-    if (code == "" || !verify(data, ["name", "creation_time"], ["string", "number"]))
+    if (code == "" || !verify(data, ["name"], ["string"]))
     {
-        ws.send(JSON.stringify({ type: NETWORK_TYPES.ADD_SERVER, success: false }));
+        ws.send(JSON.stringify({ type: NETWORK_TYPES.ADD_HOST, success: false }));
         return;
     }
 
     join_codes.push(code);
-    servers.push
+    hosts.push
     ({
         ip: ws.req!.socket.remoteAddress as string,
         port: ws.req!.socket.remotePort as number,
+
         name: data.name as string,
-        creation_time: data.creation_time as number,
-        join_code_index: join_codes.length - 1
+        creation_time: Date.now(),
+        join_code_index: join_codes.length - 1,
+
+        client_indices: [],
+        frame_data: {}
     });
 
-    ws.send(JSON.stringify({ type: NETWORK_TYPES.ADD_SERVER, success: true }));
+    ws.send(JSON.stringify({ type: NETWORK_TYPES.ADD_HOST, success: true }));
+    console.log(`${remote_id(ws.req!)} has been added as a host!`);
 }
 
-function response_get_servers(data: any, ws: WebSocketR)
+function response_get_hosts(data: Record<string, any>, ws: WebSocketR)
 {
-    ws.send(JSON.stringify(servers));
+    const host_infos: {name: string, creation_time: number, join_code: string}[] = [];
+    for (let i: number = 0; i < hosts.length; i++)
+    {
+        host_infos.push({ name: hosts[i].name, creation_time: hosts[i].creation_time, join_code: join_codes[hosts[i].join_code_index] });
+    }
+
+    ws.send(JSON.stringify({ type: NETWORK_TYPES.GET_HOSTS, hosts: host_infos }));
+    console.log(`${remote_id(ws.req!)} requested for all servers.`);
 }
 
-function response_connect(data: any, ws: WebSocketR)
+function response_connect(data: Record<string, any>, ws: WebSocketR)
 {
+    if (!verify(data, ["join_code"], ["string"]))
+    {
+        ws.send(JSON.stringify({ type: NETWORK_TYPES.CONNECT, success: false }));
+        return;
+    }
 
+    const host_index: number = hosts.findIndex((value: HostInfo) =>
+        { return join_codes[value.join_code_index] == data.join_code; });
+
+    if (host_index === -1)
+    {
+        ws.send(JSON.stringify({ type: NETWORK_TYPES.CONNECT, success: false }));
+        return;
+    }
+
+    hosts[host_index].client_indices.push(clients.length);
+    clients.push
+    ({
+        ip: ws.req!.socket.remoteAddress as string,
+        port: ws.req!.socket.remotePort as number,
+
+        host_index,
+        input_data:
+        {
+            input_pressed: [],
+            input_held: [],
+            input_released: [],
+            delta: 0
+        }
+    });
+
+    ws.send(JSON.stringify({ type: NETWORK_TYPES.CONNECT, success: true, id: hosts[host_index].client_indices.length - 1 }));
+    console.log(`${remote_id(ws.req!)} has connected to a host!`);
 }
 
-function response_inputs(data: any, ws: WebSocketR)
+function response_set_inputs_get_frame(data: Record<string, any>, ws: WebSocketR)
 {
+    const client = clients.find((value: ClientInfo) =>
+        { return value.ip === ws.req!.socket.remoteAddress && value.port === ws.req!.socket.remotePort; })
 
+    if (client === undefined || !verify(data, ["input_data"], ["object"]) ||
+    !verify(data.input_data, ["input_pressed", "input_held", "input_released", "delta"], ["object", "object", "object", "number"]))
+    {
+        ws.send(JSON.stringify({ type: NETWORK_TYPES.SET_INPUTS_GET_FRAME, success: false }));
+        return;
+    }
+
+    try { client.input_data = data.input_data; }
+    catch (e) {}
+
+    const frame_data = hosts[client.host_index].frame_data;
+    ws.send(JSON.stringify({ type: NETWORK_TYPES.SET_INPUTS_GET_FRAME, success: true, frame_data }));
 }
 
-function response_client_data(data: any, ws: WebSocketR)
+function response_set_frame_get_inputs(data: Record<string, any>, ws: WebSocketR)
 {
+    const host = hosts.find((value: HostInfo) =>
+        { return value.ip === ws.req!.socket.remoteAddress && value.port === ws.req!.socket.remotePort; })
 
-}
+    if (host === undefined || !verify(data, ["frame_data"], ["object"]))
+    {
+        ws.send(JSON.stringify({ type: NETWORK_TYPES.SET_FRAME_GET_INPUTS, success: false }));
+        return;
+    }
 
-function response_host_data(data: any, ws: WebSocketR)
-{
+    try { host.frame_data = data.frame_data; }
+    catch (e) {}
 
+    const input_data: InputInfo[] = [];
+    for (let i: number = 0; i < host.client_indices.length; i++)
+    {
+        const client_input_data = clients[host.client_indices[i]].input_data;
+        input_data.push(client_input_data);
+    }
+
+    ws.send(JSON.stringify({ type: NETWORK_TYPES.SET_FRAME_GET_INPUTS, success: true, input_data }));
 }
