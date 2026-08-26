@@ -11,14 +11,12 @@ export interface InputInfo
 
 export interface HostInfo
 {
-    ip: string,
-    port: number,
-
     name: string,
     creation_time: number,
-    join_code_index: number,
+    join_code: string,
+    joinable: boolean,
 
-    client_indices: number[],
+    client_addresses: string[],
     frame_data: Record<string, any>
 }
 
@@ -31,10 +29,7 @@ export interface DiscoveryHostInfo
 
 export interface ClientInfo
 {
-    ip: string,
-    port: number,
-
-    host_index: number,
+    host_address: string,
     input_data: InputInfo[],
     last_input_time: number
 }

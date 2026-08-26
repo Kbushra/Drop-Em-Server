@@ -11,8 +11,8 @@ import dotenv from "dotenv";
 dotenv.config();
 
 const join_codes: string[] = [];
-const hosts: HostInfo[] = [];
-const clients: ClientInfo[] = [];
+const hosts: Record<string, HostInfo> = {};
+const clients: Record<string, ClientInfo> = {};
 
 const app = express();
 app.get("/", (req: express.Request, res: express.Response) => { res.send("You're supposed to access via WSS btw."); })
@@ -23,15 +23,29 @@ const wss: WebSocketServer = new WebSocketServer({ server });
 
 wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 {
+    const packet: Packet = new Packet({}, ws, req);
+    let heartbeat_time: number = Date.now();
+    setInterval(() =>
+    {
+        if (Date.now() - heartbeat_time < 10000) { return; }
+        disconnect_address(packet.address);
+        ws.close(1006, "Failed heartbeat.");
+    }, 1000);
+
     ws.on("message", (msg: string) =>
     {
         const data: Record<string, any> = safe_parse(msg);
         if (!verify(data, ["type"], ["number"])) { return; }
 
-        const packet: Packet = new Packet(data, ws, req);
+        packet.data = data;
 
         switch (data.type as NETWORK_TYPES)
         {
+            case NETWORK_TYPES.HEARTBEAT:
+                heartbeat_time = Date.now();
+                response_success(packet);
+            break;
+
             case NETWORK_TYPES.ADD_HOST:
                 response_add_host(packet);
             break;
@@ -40,8 +54,16 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
                 response_get_hosts(packet);
             break;
 
-            case NETWORK_TYPES.CONNECT:
-                response_connect(packet);
+            case NETWORK_TYPES.JOIN:
+                response_join(packet);
+            break;
+
+            case NETWORK_TYPES.LEAVE:
+                response_leave(packet);
+            break;
+
+            case NETWORK_TYPES.KICK:
+                response_kick(packet);
             break;
 
             case NETWORK_TYPES.SET_INPUTS_GET_FRAME:
@@ -57,22 +79,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 
 server.listen(port, "0.0.0.0", () => { console.log(`Listening on port ${port}.`) });
 
-function get_client(packet: Packet)
-{
-    return clients.find((value: ClientInfo) =>
-        { return value.ip === packet.ip && value.port === packet.port; });
-}
-
-function get_host(packet: Packet)
-{
-    return hosts.find((value: HostInfo) =>
-        { return value.ip === packet.ip && value.port === packet.port; });
-}
-
-function response_err(packet: Packet)
+function response_err(packet: Packet, reason: string = "Cheating...")
 {
     if (!verify(packet.data, ["type"], ["number"])) { return; }
-    packet.send({ type: packet.data.type, success: false });
+    packet.send({ type: packet.data.type, success: false, reason });
 }
 
 function response_success(packet: Packet, extra: Record<string, any> = {})
@@ -84,22 +94,23 @@ function response_success(packet: Packet, extra: Record<string, any> = {})
 function response_add_host(packet: Packet)
 {
     const code: string = generate_random_string(join_codes, 6);
-    const client = get_client(packet);
-    const host = get_host(packet);
-    if (code == "" || client !== undefined || host !== undefined ||
-    !verify(packet.data, ["name"], ["string"])) { response_err(packet); return; }
+    const client = clients[packet.address];
+    const host = hosts[packet.address];
+    const max_host_count = 50;
+
+    if (client !== undefined || host !== undefined || !verify(packet.data, ["name"], ["string"])) { response_err(packet); return; }
+
+    if (code == "" || Object.keys(hosts).length >= max_host_count) { response_err(packet, "Host limit reached!"); return; }
 
     join_codes.push(code);
-    hosts.push
+    hosts[packet.address] =
     ({
-        ip: packet.ip as string,
-        port: packet.port as number,
-
         name: packet.data.name as string,
         creation_time: Date.now(),
-        join_code_index: join_codes.length - 1,
+        join_code: code,
+        joinable: true,
 
-        client_indices: [],
+        client_addresses: [],
         frame_data: {}
     });
 
@@ -109,14 +120,15 @@ function response_add_host(packet: Packet)
 
 function response_get_hosts(packet: Packet)
 {
+    const addresses = Object.keys(hosts);
     const host_infos: DiscoveryHostInfo[] = [];
-    for (let i: number = 0; i < hosts.length; i++)
+    for (let i: number = 0; i < addresses.length; i++)
     {
         host_infos.push
         ({
             name: hosts[i].name,
             creation_time: hosts[i].creation_time,
-            join_code: join_codes[hosts[i].join_code_index]
+            join_code: hosts[i].join_code
         });
     }
 
@@ -124,35 +136,61 @@ function response_get_hosts(packet: Packet)
     console.log(`${packet.address} requested for all servers.`);
 }
 
-function response_connect(packet: Packet)
+function response_join(packet: Packet)
 {
-    const client = get_client(packet);
-    const host = get_host(packet);
+    const client = clients[packet.address];
+    const host = hosts[packet.address];
+    const max_client_count = 500;
+
     if (client !== undefined || host !== undefined || !verify(packet.data, ["join_code"], ["string"])) { response_err(packet); return; }
 
-    const host_index: number = hosts.findIndex((value: HostInfo) =>
-        { return join_codes[value.join_code_index] == packet.data.join_code; });
+    if (Object.keys(clients).length >= max_client_count) { response_err(packet, "Client limit reached!"); return; }
 
-    if (host_index === -1) { response_err(packet); return; }
+    const host_address: string | undefined = Object.keys(hosts).find((value: string) =>
+        { return hosts[value].join_code == packet.data.join_code; });
 
-    hosts[host_index].client_indices.push(clients.length);
-    clients.push
+    if (host_address === undefined) { response_err(packet, "Invalid join code!"); return; }
+
+    hosts[host_address].client_addresses.push(packet.address);
+    clients[packet.address] =
     ({
-        ip: packet.ip as string,
-        port: packet.port as number,
-
-        host_index,
+        host_address,
         input_data: [],
         last_input_time: Date.now()
     });
 
-    response_success(packet, { id: hosts[host_index].client_indices.length - 1 });
+    response_success(packet, { id: hosts[host_address].client_addresses.length - 1 });
     console.log(`${packet.address} has connected to a host!`);
+}
+
+function disconnect_address(address: string)
+{
+    const client = clients[address];
+    const host = hosts[address];
+    if (client !== undefined) { delete clients[address]; }
+    if (host !== undefined) { join_codes.slice(join_codes.indexOf(host.join_code), 1); delete hosts[address]; }
+}
+
+function response_leave(packet: Packet)
+{
+    disconnect_address(packet.address);
+    response_success(packet);
+}
+
+function response_kick(packet: Packet)
+{
+    const host = hosts[packet.address];
+    if (host === undefined || !verify(packet.data, ["id"], ["number"])) { response_err(packet); return; }
+
+    const client_address = host.client_addresses[packet.data.id];
+    host.client_addresses[packet.data.id] = "";
+    delete clients[client_address];
+    response_success(packet);
 }
 
 function response_set_inputs_get_frame(packet: Packet)
 {
-    const client = get_client(packet);
+    const client = clients[packet.address];
     if (client === undefined || !verify(packet.data, ["input_data"], ["object"]) ||
     !verify(packet.data.input_data, ["input_pressed", "input_held", "input_released", "delta"], ["object", "object", "object", "number"]))
     {
@@ -167,24 +205,32 @@ function response_set_inputs_get_frame(packet: Packet)
         catch (e) {}
     }
 
-    const frame_data = hosts[client.host_index].frame_data;
+    const frame_data = hosts[client.host_address].frame_data;
     response_success(packet, { frame_data });
 }
 
 function response_set_frame_get_inputs(packet: Packet)
 {
-    const host = get_host(packet);
-    if (host === undefined || !verify(packet.data, ["frame_data"], ["object"])) { response_err(packet); return; }
+    const host = hosts[packet.address];
+    if (host === undefined || !verify(packet.data, ["joinable", "frame_data"], ["boolean", "object"])) { response_err(packet); return; }
 
+    host.joinable = packet.data.joinable;
     try { host.frame_data = packet.data.frame_data; }
     catch (e) {}
 
     const input_data: InputInfo[][] = [];
-    for (let i: number = 0; i < host.client_indices.length; i++)
+    for (let i: number = 0; i < host.client_addresses.length; i++)
     {
-        const client_input_data = clients[host.client_indices[i]].input_data;
-        clients[host.client_indices[i]].input_data = [];
-        input_data.push(client_input_data);
+        const client_address = host.client_addresses[i];
+        if (!(client_address in clients))
+        {
+            input_data[i] = [];
+            continue;
+        }
+
+        const client_input_data = clients[client_address].input_data;
+        clients[client_address].input_data = [];
+        input_data[i] = client_input_data;
     }
 
     response_success(packet, { input_data });
