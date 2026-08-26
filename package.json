@@ -19,10 +19,16 @@
   "author": "Quib Inc.",
   "type": "module",
   "main": "server.ts",
-  "scripts": {},
+  "scripts": {
+    "build": "npm i",
+    "start": "npx tsx server.ts"
+  },
   "dependencies": {
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.12"
   }
 }
