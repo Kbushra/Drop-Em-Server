@@ -150,6 +150,7 @@ function response_join(packet: Packet)
         { return hosts[value].join_code == packet.data.join_code; });
 
     if (host_address === undefined) { response_err(packet, "Invalid join code!"); return; }
+    if (!hosts[host_address].joinable) { response_err(packet, "Host is no longer joinable!"); return; }
 
     hosts[host_address].client_addresses.push(packet.address);
     clients[packet.address] =
@@ -191,6 +192,7 @@ function response_kick(packet: Packet)
 function response_set_inputs_get_frame(packet: Packet)
 {
     const client = clients[packet.address];
+
     if (client === undefined || !verify(packet.data, ["input_data"], ["object"]) ||
     !verify(packet.data.input_data, ["input_pressed", "input_held", "input_released", "delta"], ["object", "object", "object", "number"]))
     {
@@ -205,6 +207,8 @@ function response_set_inputs_get_frame(packet: Packet)
         catch (e) {}
     }
 
+    if (!(client.host_address in hosts)) { response_err(packet, "Host has disconnected!"); return; }
+
     const frame_data = hosts[client.host_address].frame_data;
     response_success(packet, { frame_data });
 }
@@ -218,13 +222,13 @@ function response_set_frame_get_inputs(packet: Packet)
     try { host.frame_data = packet.data.frame_data; }
     catch (e) {}
 
-    const input_data: InputInfo[][] = [];
+    const input_data: (InputInfo[] | undefined)[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
         const client_address = host.client_addresses[i];
         if (!(client_address in clients))
         {
-            input_data[i] = [];
+            input_data[i] = undefined;
             continue;
         }
 
