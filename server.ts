@@ -170,6 +170,8 @@ function disconnect_address(address: string)
     const host = hosts[address];
     if (client !== undefined) { delete clients[address]; }
     if (host !== undefined) { join_codes.slice(join_codes.indexOf(host.join_code), 1); delete hosts[address]; }
+
+    console.log(`${address} disconnected.`);
 }
 
 function response_leave(packet: Packet)
@@ -184,9 +186,11 @@ function response_kick(packet: Packet)
     if (host === undefined || !verify(packet.data, ["id"], ["number"])) { response_err(packet); return; }
 
     const client_address = host.client_addresses[packet.data.id];
+    if (clients[client_address] !== undefined) { delete clients[client_address]; }
+
     host.client_addresses[packet.data.id] = "";
-    delete clients[client_address];
     response_success(packet);
+    console.log(`${packet.address} kicked ${client_address}.`);
 }
 
 function response_set_inputs_get_frame(packet: Packet)
@@ -207,7 +211,7 @@ function response_set_inputs_get_frame(packet: Packet)
         catch (e) {}
     }
 
-    if (!(client.host_address in hosts)) { response_err(packet, "Host has disconnected!"); return; }
+    if (hosts[client.host_address] === undefined) { response_err(packet, "Host has disconnected!"); return; }
 
     const frame_data = hosts[client.host_address].frame_data;
     response_success(packet, { frame_data });
@@ -225,15 +229,15 @@ function response_set_frame_get_inputs(packet: Packet)
     const input_data: (InputInfo[] | undefined)[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
-        const client_address = host.client_addresses[i];
-        if (!(client_address in clients))
+        const client = clients[host.client_addresses[i]];
+        if (client === undefined)
         {
             input_data[i] = undefined;
             continue;
         }
 
-        const client_input_data = clients[client_address].input_data;
-        clients[client_address].input_data = [];
+        const client_input_data = client.input_data;
+        client.input_data = [];
         input_data[i] = client_input_data;
     }
 
