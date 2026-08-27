@@ -32,6 +32,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
         ws.close(1006, "Failed heartbeat.");
     }, 1000);
 
+    console.log(`Connected to ${packet.address}!`);
+
     ws.on("close", () => { disconnect_address(packet.address); });
     ws.on("message", (msg: string) =>
     {
@@ -132,7 +134,6 @@ function response_get_hosts(packet: Packet)
     }
 
     response_success(packet, { hosts: host_infos });
-    console.log(`${packet.address} requested for all servers.`);
 }
 
 function response_join(packet: Packet)
@@ -161,7 +162,7 @@ function response_join(packet: Packet)
     });
 
     response_success(packet, { id: hosts[host_address].client_addresses.length - 1 });
-    console.log(`${packet.address} has connected to a host!`);
+    console.log(`${packet.address} has connected to ${host_address}!`);
 }
 
 function disconnect_address(address: string)
