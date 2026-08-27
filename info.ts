@@ -17,6 +17,7 @@ export interface HostInfo
     joinable: boolean,
 
     client_addresses: string[],
+    client_count: number,
     frame_data: Record<string, any>
 }
 

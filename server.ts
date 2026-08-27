@@ -32,8 +32,11 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
         ws.close(1006, "Failed heartbeat.");
     }, 1000);
 
+    ws.on("close", () => { disconnect_address(packet.address); });
     ws.on("message", (msg: string) =>
     {
+        heartbeat_time = Date.now();
+        
         const data: Record<string, any> = safe_parse(msg);
         if (!verify(data, ["type"], ["number"])) { return; }
 
@@ -41,11 +44,6 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 
         switch (data.type as NETWORK_TYPES)
         {
-            case NETWORK_TYPES.HEARTBEAT:
-                heartbeat_time = Date.now();
-                response_success(packet);
-            break;
-
             case NETWORK_TYPES.ADD_HOST:
                 response_add_host(packet);
             break;
@@ -111,10 +109,11 @@ function response_add_host(packet: Packet)
         joinable: true,
 
         client_addresses: [],
+        client_count: 0,
         frame_data: {}
     });
 
-    response_success(packet);
+    response_success(packet, { join_code: code });
     console.log(`${packet.address} has been added as a host!`);
 }
 
@@ -153,6 +152,7 @@ function response_join(packet: Packet)
     if (!hosts[host_address].joinable) { response_err(packet, "Host is no longer joinable!"); return; }
 
     hosts[host_address].client_addresses.push(packet.address);
+    hosts[host_address].client_count++;
     clients[packet.address] =
     ({
         host_address,
@@ -189,6 +189,7 @@ function response_kick(packet: Packet)
     if (clients[client_address] !== undefined) { delete clients[client_address]; }
 
     host.client_addresses[packet.data.id] = "";
+    host.client_count--;
     response_success(packet);
     console.log(`${packet.address} kicked ${client_address}.`);
 }
@@ -211,10 +212,10 @@ function response_set_inputs_get_frame(packet: Packet)
         catch (e) {}
     }
 
-    if (hosts[client.host_address] === undefined) { response_err(packet, "Host has disconnected!"); return; }
+    const host = hosts[client.host_address];
+    if (host === undefined) { response_err(packet, "Host has disconnected!"); return; }
 
-    const frame_data = hosts[client.host_address].frame_data;
-    response_success(packet, { frame_data });
+    response_success(packet, { client_count: host.client_count, frame_data: host.frame_data });
 }
 
 function response_set_frame_get_inputs(packet: Packet)
@@ -226,20 +227,21 @@ function response_set_frame_get_inputs(packet: Packet)
     try { host.frame_data = packet.data.frame_data; }
     catch (e) {}
 
-    const input_data: (InputInfo[] | undefined)[] = [];
+    host.client_count = 0;
+    const input_data: (InputInfo[] | -1)[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
         const client = clients[host.client_addresses[i]];
         if (client === undefined)
         {
-            input_data[i] = undefined;
+            input_data[i] = -1;
             continue;
         }
 
-        const client_input_data = client.input_data;
+        input_data[i] = client.input_data;
         client.input_data = [];
-        input_data[i] = client_input_data;
+        host.client_count++;
     }
-
+    
     response_success(packet, { input_data });
 }
