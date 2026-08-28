@@ -157,7 +157,8 @@ function response_join(packet: Packet)
         { return hosts[value].join_code == packet.data.join_code; });
 
     if (host_address === undefined) { response_err(packet, "Invalid join code!"); return; }
-    if (!hosts[host_address].joinable) { response_err(packet, "Host is no longer joinable!"); return; }
+    if (!hosts[host_address].joinable || hosts[host_address].client_addresses.length - hosts[host_address].clients_removed >= 7)
+        { response_err(packet, "Host is no longer joinable!"); return; }
 
     hosts[host_address].client_addresses.push(packet.address);
     clients[packet.address] =
