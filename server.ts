@@ -129,9 +129,9 @@ function response_get_hosts(packet: Packet)
     {
         host_infos.push
         ({
-            name: hosts[i].name,
-            creation_time: hosts[i].creation_time,
-            join_code: hosts[i].join_code
+            name: hosts[addresses[i]].name,
+            creation_time: hosts[addresses[i]].creation_time,
+            join_code: hosts[addresses[i]].join_code
         });
     }
 
@@ -149,7 +149,7 @@ function response_join(packet: Packet)
     if (Object.keys(clients).length >= max_client_count) { response_err(packet, "Client limit reached!"); return; }
 
     const host_address: string | undefined = Object.keys(hosts).find((value: string) =>
-        { return hosts[value].join_code == packet.data.join_code; });
+        { console.log(`${hosts[value].join_code} vs ${packet.data.join_code}`); return hosts[value].join_code == packet.data.join_code; });
 
     if (host_address === undefined) { response_err(packet, "Invalid join code!"); return; }
     if (!hosts[host_address].joinable) { response_err(packet, "Host is no longer joinable!"); return; }
