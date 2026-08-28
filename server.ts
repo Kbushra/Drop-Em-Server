@@ -30,13 +30,18 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
         if (Date.now() - heartbeat_time < 10000) { return; }
 
         disconnect_address(packet.address);
-        ws.terminate();
         clearInterval(heartbeats);
+        ws.terminate();
     }, 1000);
 
     console.log(`Connected to ${packet.address}!`);
 
-    ws.on("close", () => { disconnect_address(packet.address); });
+    ws.on("close", () =>
+    {
+        disconnect_address(packet.address);
+        clearInterval(heartbeats);
+    });
+
     ws.on("message", (msg: string) =>
     {
         heartbeat_time = Date.now();
@@ -149,7 +154,7 @@ function response_join(packet: Packet)
     if (Object.keys(clients).length >= max_client_count) { response_err(packet, "Client limit reached!"); return; }
 
     const host_address: string | undefined = Object.keys(hosts).find((value: string) =>
-        { console.log(`${hosts[value].join_code} vs ${packet.data.join_code}`); return hosts[value].join_code == packet.data.join_code; });
+        { return hosts[value].join_code == packet.data.join_code; });
 
     if (host_address === undefined) { response_err(packet, "Invalid join code!"); return; }
     if (!hosts[host_address].joinable) { response_err(packet, "Host is no longer joinable!"); return; }
