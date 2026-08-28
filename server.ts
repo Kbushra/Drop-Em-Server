@@ -25,11 +25,13 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 {
     const packet: Packet = new Packet({}, ws, req);
     let heartbeat_time: number = Date.now();
-    setInterval(() =>
+    const heartbeats = setInterval(() =>
     {
         if (Date.now() - heartbeat_time < 10000) { return; }
+        
         disconnect_address(packet.address);
         ws.terminate();
+        clearInterval(heartbeats);
     }, 1000);
 
     console.log(`Connected to ${packet.address}!`);
