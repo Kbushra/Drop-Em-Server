@@ -28,7 +28,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
     const heartbeats = setInterval(() =>
     {
         if (Date.now() - heartbeat_time < 10000) { return; }
-        
+
         disconnect_address(packet.address);
         ws.terminate();
         clearInterval(heartbeats);
@@ -113,7 +113,7 @@ function response_add_host(packet: Packet)
         joinable: true,
 
         client_addresses: [],
-        client_count: 0,
+        clients_removed: 0,
         frame_data: {}
     });
 
@@ -155,7 +155,6 @@ function response_join(packet: Packet)
     if (!hosts[host_address].joinable) { response_err(packet, "Host is no longer joinable!"); return; }
 
     hosts[host_address].client_addresses.push(packet.address);
-    hosts[host_address].client_count++;
     clients[packet.address] =
     ({
         host_address,
@@ -192,7 +191,7 @@ function response_kick(packet: Packet)
     if (clients[client_address] !== undefined) { delete clients[client_address]; }
 
     host.client_addresses[packet.data.id] = "";
-    host.client_count--;
+    host.clients_removed++;
     response_success(packet);
     console.log(`${packet.address} kicked ${client_address}.`);
 }
@@ -218,7 +217,7 @@ function response_set_inputs_get_frame(packet: Packet)
     const host = hosts[client.host_address];
     if (host === undefined) { response_err(packet, "Host has disconnected!"); return; }
 
-    response_success(packet, { client_count: host.client_count, frame_data: host.frame_data });
+    response_success(packet, { client_count: host.client_addresses.length, clients_removed: host.clients_removed, frame_data: host.frame_data });
 }
 
 function response_set_frame_get_inputs(packet: Packet)
@@ -230,20 +229,20 @@ function response_set_frame_get_inputs(packet: Packet)
     try { host.frame_data = packet.data.frame_data; }
     catch (e) {}
 
-    host.client_count = 0;
+    host.clients_removed = 0;
     const input_data: (InputInfo[] | -1)[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
         const client = clients[host.client_addresses[i]];
         if (client === undefined)
         {
+            host.clients_removed++;
             input_data[i] = -1;
             continue;
         }
 
         input_data[i] = client.input_data;
         client.input_data = [];
-        host.client_count++;
     }
     
     response_success(packet, { input_data });
