@@ -163,7 +163,7 @@ function response_join(packet: Packet)
     clients[packet.address] =
     ({
         host_address,
-        input_data: [],
+        input_data: { input_pressed: [], input_held: [], input_released: [], delta: 0 },
         last_input_time: Date.now()
     });
 
@@ -215,7 +215,7 @@ function response_set_inputs_get_frame(packet: Packet)
     if (packet.data.input_data.delta < Date.now() - client.last_input_time)
     {
         client.last_input_time = Date.now();
-        try { client.input_data.push(packet.data.input_data); }
+        try { client.input_data = packet.data.input_data; }
         catch (e) {}
     }
 
@@ -235,7 +235,7 @@ function response_set_frame_get_inputs(packet: Packet)
     catch (e) {}
 
     host.clients_removed = 0;
-    const input_data: (InputInfo[] | -1)[] = [];
+    const input_data: (InputInfo | -1)[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
         const client = clients[host.client_addresses[i]];
@@ -247,7 +247,6 @@ function response_set_frame_get_inputs(packet: Packet)
         }
 
         input_data[i] = client.input_data;
-        client.input_data = [];
     }
     
     response_success(packet, { input_data });

@@ -31,7 +31,7 @@ export interface DiscoveryHostInfo
 export interface ClientInfo
 {
     host_address: string,
-    input_data: InputInfo[],
+    input_data: InputInfo,
     last_input_time: number
 }
 
