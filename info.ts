@@ -3,9 +3,7 @@ import { WebSocket } from "ws";
 
 export interface InputInfo
 {
-    input_pressed: boolean[],
     input_held: boolean[],
-    input_released: boolean[],
     delta: number
 }
 

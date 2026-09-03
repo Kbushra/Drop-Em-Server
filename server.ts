@@ -207,7 +207,7 @@ function response_set_inputs_get_frame(packet: Packet)
     const client = clients[packet.address];
 
     if (client === undefined || !verify(packet.data, ["input_data"], ["object"]) ||
-    !verify(packet.data.input_data, ["input_pressed", "input_held", "input_released", "delta"], ["object", "object", "object", "number"]))
+    !verify(packet.data.input_data, ["input_held", "delta"], ["object", "number"]))
     {
         response_err(packet);
         return;
