@@ -165,7 +165,7 @@ function response_join(packet: Packet)
     ({
         host_address,
         input_data: [],
-        last_input_time: Date.now()
+        last_input_time: Date.now()/1000
     });
 
     response_success(packet, { id: hosts[host_address].client_addresses.length - 1 });
@@ -213,9 +213,9 @@ function response_set_inputs_get_frame(packet: Packet)
         return;
     }
 
-    if (packet.data.input_data.delta < Date.now() - client.last_input_time)
+    if (packet.data.input_data.delta < Date.now()/1000 - client.last_input_time)
     {
-        client.last_input_time = Date.now();
+        client.last_input_time += packet.data.input_data.delta;
         try { client.input_data.push(packet.data.input_data); }
         catch (e) {}
     }
