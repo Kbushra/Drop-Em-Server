@@ -28,21 +28,22 @@ export function generate_random_string(blacklist: string[], len: number): string
 
     let result: string = "";
 
-    for (let i: number = 0; i < 50; i++) //50 attempts max
-    {
-        result = "";
-        for (let i: number = 0; i < len; i++)
-        {
-            const num = Math.floor(Math.random() * 62);
-            result += number_to_alphanumeric(num);
-        }
+    const original_num = Math.floor(Math.random() * (62**len));
+    let num = original_num;
 
+    result = number_to_base62(num, len);
+    if (!blacklist.includes(result)) { return result; }
+
+    while (--num >= 0)
+    {
+        result = number_to_base62(num, len);
         if (!blacklist.includes(result)) { return result; }
     }
 
-    for (let i: number = 0; i < 62**len; i++)
+    num = original_num;
+    while (++num < 62**len)
     {
-        result = number_to_base62(i, len);
+        result = number_to_base62(num, len);
         if (!blacklist.includes(result)) { return result; }
     }
 

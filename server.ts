@@ -105,7 +105,9 @@ function response_add_host(packet: Packet)
     const host = hosts[packet.address];
     const max_host_count = 50;
 
-    if (client !== undefined || host !== undefined || !verify(packet.data, ["name"], ["string"])) { response_err(packet); return; }
+    if (client !== undefined) { response_err(packet, "Already a client!"); return; }
+    if (host !== undefined) { response_err(packet, "Already a host!"); return; }
+    if (!verify(packet.data, ["name"], ["string"])) { response_err(packet, "Unreadable packet!"); return; }
 
     if (code == "" || Object.keys(hosts).length >= max_host_count) { response_err(packet, "Host limit reached!"); return; }
 
@@ -149,7 +151,9 @@ function response_join(packet: Packet)
     const host = hosts[packet.address];
     const max_client_count = 500;
 
-    if (client !== undefined || host !== undefined || !verify(packet.data, ["join_code"], ["string"])) { response_err(packet); return; }
+    if (client !== undefined) { response_err(packet, "Already a client!"); return; }
+    if (host !== undefined) { response_err(packet, "Already a host!"); return; }
+    if (!verify(packet.data, ["join_code"], ["string"])) { response_err(packet, "Unreadable packet!"); return; }
 
     if (Object.keys(clients).length >= max_client_count) { response_err(packet, "Client limit reached!"); return; }
 
@@ -191,7 +195,9 @@ function response_leave(packet: Packet)
 function response_kick(packet: Packet)
 {
     const host = hosts[packet.address];
-    if (host === undefined || !verify(packet.data, ["id"], ["number"])) { response_err(packet); return; }
+
+    if (host === undefined) { response_err(packet, "Not a host!"); return; }
+    if (!verify(packet.data, ["id"], ["number"])) { response_err(packet, "Unreadable packet!"); return; }
 
     const client_address = host.client_addresses[packet.data.id];
     if (clients[client_address] !== undefined) { delete clients[client_address]; }
@@ -206,12 +212,9 @@ function response_set_inputs_get_frame(packet: Packet)
 {
     const client = clients[packet.address];
 
-    if (client === undefined || !verify(packet.data, ["input_data"], ["object"]) ||
-    !verify(packet.data.input_data, ["input_held", "delta"], ["object", "number"]))
-    {
-        response_err(packet);
-        return;
-    }
+    if (client === undefined) { response_err(packet, "Not a client!"); return; }
+    if (!verify(packet.data, ["input_data"], ["object"]) || !verify(packet.data.input_data, ["input_held", "delta"], ["object", "number"]))
+        { response_err(packet, "Unreadable packet!"); return; }
 
     if (packet.data.input_data.delta < Date.now()/1000 - client.last_input_time)
     {
@@ -229,7 +232,9 @@ function response_set_inputs_get_frame(packet: Packet)
 function response_set_frame_get_inputs(packet: Packet)
 {
     const host = hosts[packet.address];
-    if (host === undefined || !verify(packet.data, ["joinable", "frame_data"], ["boolean", "object"])) { response_err(packet); return; }
+
+    if (host === undefined) { response_err(packet, "Not a host!"); return; }
+    if (!verify(packet.data, ["joinable", "frame_data"], ["boolean", "object"])) { response_err(packet, "Unreadable packet!"); return; }
 
     host.joinable = packet.data.joinable;
     try { host.frame_data = packet.data.frame_data; }
