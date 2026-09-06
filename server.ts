@@ -27,7 +27,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
     let heartbeat_time: number = Date.now();
     const heartbeats = setInterval(() =>
     {
-        if (Date.now() - heartbeat_time < 10000) { return; }
+        if (Date.now() - heartbeat_time < 10 * 60 * 1000) { return; }
 
         disconnect_address(packet.address);
         clearInterval(heartbeats);
