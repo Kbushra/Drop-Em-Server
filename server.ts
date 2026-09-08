@@ -89,7 +89,7 @@ server.listen(port, "0.0.0.0", () => { console.log(`Listening on port ${port}.`)
 function host_joinable(address: string): boolean
 {
     const client_limit = 7;
-    return hosts[address].joinable && hosts[address].client_addresses.length - hosts[address].clients_removed >= client_limit;
+    return hosts[address].joinable && hosts[address].client_addresses.length - hosts[address].clients_removed < client_limit;
 }
 
 function response_err(packet: Packet, reason: string = "Cheating...")
@@ -141,7 +141,7 @@ function response_get_hosts(packet: Packet)
     for (let i: number = 0; i < addresses.length; i++)
     {
         if (!host_joinable(addresses[i])) { continue; }
-        
+
         host_infos.push
         ({
             name: hosts[addresses[i]].name,
