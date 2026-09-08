@@ -86,6 +86,12 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 
 server.listen(port, "0.0.0.0", () => { console.log(`Listening on port ${port}.`) });
 
+function host_joinable(address: string): boolean
+{
+    const client_limit = 7;
+    return hosts[address].joinable && hosts[address].client_addresses.length - hosts[address].clients_removed >= client_limit;
+}
+
 function response_err(packet: Packet, reason: string = "Cheating...")
 {
     if (!verify(packet.data, ["type"], ["number"])) { return; }
@@ -134,6 +140,8 @@ function response_get_hosts(packet: Packet)
     const host_infos: DiscoveryHostInfo[] = [];
     for (let i: number = 0; i < addresses.length; i++)
     {
+        if (!host_joinable(addresses[i])) { continue; }
+        
         host_infos.push
         ({
             name: hosts[addresses[i]].name,
@@ -161,8 +169,7 @@ function response_join(packet: Packet)
         { return hosts[value].join_code == packet.data.join_code; });
 
     if (host_address === undefined) { response_err(packet, "Invalid join code!"); return; }
-    if (!hosts[host_address].joinable || hosts[host_address].client_addresses.length - hosts[host_address].clients_removed >= 7)
-        { response_err(packet, "Host is no longer joinable!"); return; }
+    if (!host_joinable(host_address)) { response_err(packet, "Host is no longer joinable!"); return; }
 
     hosts[host_address].client_addresses.push(packet.address);
     clients[packet.address] =
