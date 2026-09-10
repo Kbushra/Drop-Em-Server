@@ -42,6 +42,7 @@ export class Packet
     public data: Record<string, any>;
     private ws: WebSocket;
     private req: IncomingMessage;
+    public heartbeat_time: number;
     public latency: number;
     public last_ping: number;
     constructor(data: Record<string, any>, ws: WebSocket, req: IncomingMessage)
@@ -49,6 +50,7 @@ export class Packet
         this.data = data;
         this.ws = ws;
         this.req = req;
+        this.heartbeat_time = Date.now()/1000;
         this.latency = 0;
         this.last_ping = Date.now()/1000;
     }

@@ -24,10 +24,9 @@ const wss: WebSocketServer = new WebSocketServer({ server });
 wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 {
     const packet: Packet = new Packet({}, ws, req);
-    let heartbeat_time: number = Date.now();
     const heartbeats = setInterval(() =>
     {
-        if (Date.now() - heartbeat_time < 10 * 60 * 1000) { return; }
+        if (Date.now()/1000 - packet.heartbeat_time < 10 * 60) { return; }
 
         disconnect_address(packet.address);
         clearInterval(heartbeats);
@@ -44,7 +43,7 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
 
     ws.on("message", (msg: string) =>
     {
-        heartbeat_time = Date.now();
+        packet.heartbeat_time = Date.now()/1000;
         
         const data: Record<string, any> = safe_parse(msg);
         if (!verify(data, ["type"], ["number"])) { return; }
@@ -125,7 +124,7 @@ function response_add_host(packet: Packet)
     hosts[packet.address] =
     ({
         name: packet.data.name as string,
-        creation_time: Date.now(),
+        creation_time: Date.now()/1000,
         join_code: code,
         joinable: true,
 
@@ -279,7 +278,7 @@ function response_set_frame_get_inputs(packet: Packet)
 
 function response_ping(packet: Packet)
 {
-    packet.latency = Date.now() - packet.last_ping;
-    packet.last_ping = Date.now();
+    packet.latency = Date.now()/1000 - packet.last_ping;
+    packet.last_ping = Date.now()/1000;
     response_success(packet, { latency: packet.latency });
 }
