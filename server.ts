@@ -80,6 +80,10 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) =>
             case NETWORK_TYPES.SET_FRAME_GET_INPUTS:
                 response_set_frame_get_inputs(packet);
             break;
+
+            case NETWORK_TYPES.PING:
+                response_ping(packet);
+            break;
         }
     });
 });
@@ -176,7 +180,10 @@ function response_join(packet: Packet)
     ({
         host_address,
         input_data: [],
-        last_input_time: Date.now()/1000
+        last_input_time: Date.now()/1000,
+
+        latency: 0,
+        last_ping: Date.now()/1000
     });
 
     response_success(packet, { id: hosts[host_address].client_addresses.length - 1 });
@@ -233,7 +240,7 @@ function response_set_inputs_get_frame(packet: Packet)
     const host = hosts[client.host_address];
     if (host === undefined) { response_err(packet, "Host has disconnected!"); return; }
 
-    response_success(packet, { client_count: host.client_addresses.length, clients_removed: host.clients_removed, frame_data: host.frame_data });
+    response_success(packet, { latency: client.latency, client_count: host.client_addresses.length, clients_removed: host.clients_removed, frame_data: host.frame_data });
 }
 
 function response_set_frame_get_inputs(packet: Packet)
@@ -249,6 +256,7 @@ function response_set_frame_get_inputs(packet: Packet)
 
     host.clients_removed = 0;
     const input_data: (InputInfo[] | -1)[] = [];
+    const latencies: number[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
         const client = clients[host.client_addresses[i]];
@@ -256,12 +264,24 @@ function response_set_frame_get_inputs(packet: Packet)
         {
             host.clients_removed++;
             input_data[i] = -1;
+            latencies[i] = 0;
             continue;
         }
 
         input_data[i] = client.input_data;
+        latencies[i] = client.latency;
         client.input_data = [];
     }
     
-    response_success(packet, { input_data });
+    response_success(packet, { input_data, latencies });
+}
+
+function response_ping(packet: Packet)
+{
+    const client = clients[packet.address];
+    if (client === undefined) { response_err(packet, "Not a client!"); return; }
+
+    client.latency = Date.now() - client.last_ping;
+    client.last_ping = Date.now();
+    response_success(packet);
 }
