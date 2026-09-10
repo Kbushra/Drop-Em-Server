@@ -278,10 +278,14 @@ function response_set_frame_get_inputs(packet: Packet)
 
 function response_ping(packet: Packet)
 {
+    console.log("received ping");
+
     const client = clients[packet.address];
     if (client === undefined) { response_err(packet, "Not a client!"); return; }
 
     client.latency = Date.now() - client.last_ping;
     client.last_ping = Date.now();
     response_success(packet, { latency: client.latency });
+
+    console.log("sending latency");
 }
