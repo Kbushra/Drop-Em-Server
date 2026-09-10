@@ -16,7 +16,9 @@ export interface HostInfo
 
     client_addresses: string[],
     clients_removed: number,
-    frame_data: Record<string, any>
+    frame_data: Record<string, any>,
+
+    packet: Packet
 }
 
 export interface DiscoveryHostInfo
@@ -32,8 +34,7 @@ export interface ClientInfo
     input_data: InputInfo[],
     last_input_time: number,
 
-    latency: number,
-    last_ping: number
+    packet: Packet
 }
 
 export class Packet
@@ -41,11 +42,15 @@ export class Packet
     public data: Record<string, any>;
     private ws: WebSocket;
     private req: IncomingMessage;
+    public latency: number;
+    public last_ping: number;
     constructor(data: Record<string, any>, ws: WebSocket, req: IncomingMessage)
     {
         this.data = data;
         this.ws = ws;
         this.req = req;
+        this.latency = 0;
+        this.last_ping = Date.now()/1000;
     }
 
     public get ip() { return this.req.socket.remoteAddress; }

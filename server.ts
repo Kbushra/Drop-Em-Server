@@ -131,7 +131,9 @@ function response_add_host(packet: Packet)
 
         client_addresses: [],
         clients_removed: 0,
-        frame_data: {}
+        frame_data: {},
+
+        packet
     });
 
     response_success(packet, { join_code: code });
@@ -182,8 +184,7 @@ function response_join(packet: Packet)
         input_data: [],
         last_input_time: Date.now()/1000,
 
-        latency: 0,
-        last_ping: Date.now()/1000
+        packet
     });
 
     response_success(packet, { id: hosts[host_address].client_addresses.length - 1 });
@@ -269,7 +270,7 @@ function response_set_frame_get_inputs(packet: Packet)
         }
 
         input_data[i] = client.input_data;
-        latencies[i] = client.latency;
+        latencies[i] = client.packet.latency;
         client.input_data = [];
     }
     
@@ -278,14 +279,7 @@ function response_set_frame_get_inputs(packet: Packet)
 
 function response_ping(packet: Packet)
 {
-    console.log("received ping");
-
-    const client = clients[packet.address];
-    if (client === undefined) { response_err(packet, "Not a client!"); return; }
-
-    client.latency = Date.now() - client.last_ping;
-    client.last_ping = Date.now();
-    response_success(packet, { latency: client.latency });
-
-    console.log("sending latency");
+    packet.latency = Date.now() - packet.last_ping;
+    packet.last_ping = Date.now();
+    response_success(packet, { latency: packet.latency });
 }
