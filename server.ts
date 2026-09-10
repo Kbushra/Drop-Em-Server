@@ -240,7 +240,7 @@ function response_set_inputs_get_frame(packet: Packet)
     const host = hosts[client.host_address];
     if (host === undefined) { response_err(packet, "Host has disconnected!"); return; }
 
-    response_success(packet, { latency: client.latency, client_count: host.client_addresses.length, clients_removed: host.clients_removed, frame_data: host.frame_data });
+    response_success(packet, { client_count: host.client_addresses.length, clients_removed: host.clients_removed, frame_data: host.frame_data });
 }
 
 function response_set_frame_get_inputs(packet: Packet)
@@ -283,5 +283,5 @@ function response_ping(packet: Packet)
 
     client.latency = Date.now() - client.last_ping;
     client.last_ping = Date.now();
-    response_success(packet);
+    response_success(packet, { latency: client.latency });
 }
