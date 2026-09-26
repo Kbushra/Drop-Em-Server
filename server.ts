@@ -252,7 +252,14 @@ function response_set_inputs_get_frame(packet: Packet)
     const host = hosts[client.host_address];
     if (host === undefined) { response_err(packet, "Host has disconnected!"); return; }
 
-    response_success(packet, { client_count: host.client_addresses.length, clients_removed: host.clients_removed, frame_data: host.frame_data });
+    response_success(packet,
+    {
+        client_count: host.client_addresses.length,
+        clients_removed: host.clients_removed,
+        frame_data: host.frame_data,
+        map_index: host.map_index,
+        level_index: host.level_index
+    });
 }
 
 function response_set_frame_get_inputs(packet: Packet)
