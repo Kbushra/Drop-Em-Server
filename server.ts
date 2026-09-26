@@ -116,14 +116,18 @@ function response_add_host(packet: Packet)
 
     if (client !== undefined) { response_err(packet, "Already a client!"); return; }
     if (host !== undefined) { response_err(packet, "Already a host!"); return; }
-    if (!verify(packet.data, ["name"], ["string"])) { response_err(packet, "Unreadable packet!"); return; }
+    if (!verify(packet.data, ["player_name", "server_name", "map_index", "level_index"], ["string, string", "number", "number"]))
+        { response_err(packet, "Unreadable packet!"); return; }
 
     if (code == "" || Object.keys(hosts).length >= max_host_count) { response_err(packet, "Host limit reached!"); return; }
 
     join_codes.push(code);
     hosts[packet.address] =
     ({
-        name: packet.data.name as string,
+        player_name: packet.data.player_name as string,
+        server_name: packet.data.server_name as string,
+        map_index: packet.data.map_index as number,
+        level_index: packet.data.level_index as number,
         creation_time: Date.now()/1000,
         join_code: code,
         joinable: true,
@@ -149,7 +153,9 @@ function response_get_hosts(packet: Packet)
 
         host_infos.push
         ({
-            name: hosts[addresses[i]].name,
+            server_name: hosts[addresses[i]].server_name,
+            map_index: hosts[addresses[i]].map_index,
+            level_index: hosts[addresses[i]].level_index,
             creation_time: hosts[addresses[i]].creation_time,
             join_code: hosts[addresses[i]].join_code
         });
@@ -166,7 +172,7 @@ function response_join(packet: Packet)
 
     if (client !== undefined) { response_err(packet, "Already a client!"); return; }
     if (host !== undefined) { response_err(packet, "Already a host!"); return; }
-    if (!verify(packet.data, ["join_code"], ["string"])) { response_err(packet, "Unreadable packet!"); return; }
+    if (!verify(packet.data, ["join_code", "player_name"], ["string", "string"])) { response_err(packet, "Unreadable packet!"); return; }
 
     if (Object.keys(clients).length >= max_client_count) { response_err(packet, "Client limit reached!"); return; }
 
@@ -179,6 +185,7 @@ function response_join(packet: Packet)
     hosts[host_address].client_addresses.push(packet.address);
     clients[packet.address] =
     ({
+        player_name: packet.data.player_name as string,
         host_address,
         input_data: [],
         last_input_time: Date.now()/1000,
@@ -186,7 +193,12 @@ function response_join(packet: Packet)
         packet
     });
 
-    response_success(packet, { id: hosts[host_address].client_addresses.length - 1 });
+    response_success(packet,
+    {
+        id: hosts[host_address].client_addresses.length - 1,
+        map_index: hosts[host_address].map_index,
+        level_index: hosts[host_address].level_index
+    });
     console.log(`${packet.address} has connected to ${host_address}!`);
 }
 
@@ -257,6 +269,7 @@ function response_set_frame_get_inputs(packet: Packet)
     host.clients_removed = 0;
     const input_data: (InputInfo[] | -1)[] = [];
     const latencies: number[] = [];
+    const player_names: string[] = [];
     for (let i: number = 0; i < host.client_addresses.length; i++)
     {
         const client = clients[host.client_addresses[i]];
@@ -265,15 +278,17 @@ function response_set_frame_get_inputs(packet: Packet)
             host.clients_removed++;
             input_data[i] = -1;
             latencies[i] = 0;
+            player_names[i] = "";
             continue;
         }
 
         input_data[i] = client.input_data;
         latencies[i] = client.packet.latency;
+        player_names[i] = client.player_name;
         client.input_data = [];
     }
     
-    response_success(packet, { input_data, latencies });
+    response_success(packet, { input_data, latencies, player_names });
 }
 
 function response_ping(packet: Packet)

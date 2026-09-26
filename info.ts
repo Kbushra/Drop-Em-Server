@@ -9,7 +9,10 @@ export interface InputInfo
 
 export interface HostInfo
 {
-    name: string,
+    player_name: string,
+    server_name: string,
+    map_index: number,
+    level_index: number,
     creation_time: number,
     join_code: string,
     joinable: boolean,
@@ -23,13 +26,16 @@ export interface HostInfo
 
 export interface DiscoveryHostInfo
 {
-    name: string,
+    server_name: string,
+    map_index: number,
+    level_index: number,
     creation_time: number,
     join_code: string
 }
 
 export interface ClientInfo
 {
+    player_name: string,
     host_address: string,
     input_data: InputInfo[],
     last_input_time: number,
