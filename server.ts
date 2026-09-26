@@ -116,7 +116,7 @@ function response_add_host(packet: Packet)
 
     if (client !== undefined) { response_err(packet, "Already a client!"); return; }
     if (host !== undefined) { response_err(packet, "Already a host!"); return; }
-    if (!verify(packet.data, ["player_name", "server_name", "map_index", "level_index"], ["string, string", "number", "number"]))
+    if (!verify(packet.data, ["player_name", "server_name", "map_index", "level_index"], ["string", "string", "number", "number"]))
         { response_err(packet, "Unreadable packet!"); return; }
 
     if (code == "" || Object.keys(hosts).length >= max_host_count) { response_err(packet, "Host limit reached!"); return; }
